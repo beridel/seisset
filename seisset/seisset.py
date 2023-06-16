@@ -100,7 +100,6 @@ min_longitude = -129
 max_longitude = -121.5
 location = '*'
 channels_search = 'BHN,BHE,BHZ,HHN,HHE,HHZ,EHN,EHE,EHZ'
-sampling_rate = 40.
 start_time = '2005-01-01T00:00:00'
 stop_time = '2023-06-01T00:00:00'
 start_before = '2010-01-01T00:00:00'
@@ -132,7 +131,7 @@ for network in inventory:
 
             if channel.end_date is None:
                 latest_data = None
-            elif channel.end_date > latest_data:
+            elif latest_data is not None and channel.end_date > latest_data:
                 latest_data = channel.end_date
 
         if earliest_data > start_before_date:
