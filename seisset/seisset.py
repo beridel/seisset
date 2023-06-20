@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import datetime as dt
 import obspy as obs
@@ -38,10 +39,10 @@ def get_avail(network, station, location, channels, sampling_rate, dates):
                                )
         with requests.get(url, stream=False) as avail_stream:
             
-            lines = avail.stream.iter_lines(chunk_size=None, decode_unicode=True)
+            lines = avail_stream.iter_lines(chunk_size=None, decode_unicode=True)
             first_line = next(lines)
 
-            if line == 'Error 404: No Data Found':
+            if first_line == 'Error 404: No Data Found':
                 break
 
             # UW DOSE -- BHZ M 40.0 2019-05-03T01:20:59.315000Z 2019-05-03T01:23:10.740000Z
@@ -92,7 +93,10 @@ def get_avail(network, station, location, channels, sampling_rate, dates):
 
     return avail
 
-out_file = 'avail.txt'
+all_out_file = 'all_avail.txt'
+out_dir = 'avail'
+if not os.path.isdir(os.path.join(os.getcwd(), out_dir)):
+    os.mkdir(os.path.join(os.getcwd(), out_dir))
 
 networks = 'UW,PB,CC,CN,C8'
 min_latitude = 46
@@ -149,15 +153,17 @@ while date <= stop_date:
 
 n_dates = len(dates)
 
-with open(out_file, 'w+') as out:
+with open(all_out_file, 'w+') as all_out:
     for network in inventory:
         for station in network:
-            out.write('{}.{} | '.format(network.code, station.code))
             channel_ids = []
             for channel in station:
                 channel_ids.append('{}:{:d}'.format(channel.code, int(channel.sample_rate)))
 
             channel_ids = set(channel_ids)
+
+            avail_station = np.zeros((n_dates, 3), dtype=np.single) # N E Z
+
 
             timer = dt.datetime.now()
             for channel_id in channel_ids:
@@ -165,7 +171,22 @@ with open(out_file, 'w+') as out:
                 sampling_rate = float(channel_id.split(':')[1])
                 avail = get_avail(network.code, station.code, '*', channel, sampling_rate, dates)
 
-                out.write('{}={} '.format(channel_id, np.sum(avail)))
-        
-            out.write('\n')
+                if channel[-1] == 'N':
+                    c = 0
+                elif channel[-1] == 'E':
+                    c = 1
+                elif channel[-1] == 'Z':
+                    c = 2
+                avail_station[:, c] += avail.flatten()
+
+                with open(os.path.join(os.getcwd(), out_dir, '{}.{}_avail.txt'.format(station.code, channel_id)), 'w+') as station_out:
+                    for d in range(n_dates):
+                        station_out.write('{} {:.2f}\n'.format(dates[d].strftime('%Y-%m-%d'), avail.flatten()[d]))
+
+            all_out.write('{}.{} | N: {:04.1f} E: {:04.1f} Z: {:04.1f} (min: {:.2f} yr)\n'.format(network.code,
+                                                                                             station.code,
+                                                                                             np.sum(avail_station[:, 0]),
+                                                                                             np.sum(avail_station[:, 1]),
+                                                                                             np.sum(avail_station[:, 2]),
+                                                                                             np.min(np.sum(avail_station, axis=0)) / 365))
             print('It took {:.2f}s for {}:{}.'.format((dt.datetime.now() - timer).total_seconds(), network.code, station.code))
