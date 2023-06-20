@@ -36,58 +36,59 @@ def get_avail(network, station, location, channels, sampling_rate, dates):
                                starttime=start_time,
                                endtime=stop_time
                                )
-        avail_stream = requests.get(url, stream=True)
-        
-        # UW DOSE -- BHZ M 40.0 2019-05-03T01:20:59.315000Z 2019-05-03T01:23:10.740000Z
-        skip_line = True
-        for line in avail_stream.iter_lines():
-            if skip_line:
-                skip_line = False
-                continue
-
-            split_line = line.decode('ascii').split()
-            assert split_line[0] == network
-            assert split_line[1] == station
-            assert split_line[3] == channels[c]
+        with requests.get(url, stream=False) as avail_stream:
             
-            # who knows what happened, but not worth our time
-            if float(split_line[5]) != sampling_rate:
-                continue
+            lines = avail.stream.iter_lines(chunk_size=None, decode_unicode=True)
+            first_line = next(lines)
 
-            line_start = obs.UTCDateTime(split_line[6])
-            line_stop = obs.UTCDateTime(split_line[7])
+            if line == 'Error 404: No Data Found':
+                break
 
-            line_time = line_start
-            line_left = (line_stop - line_start) / 86400 # in days
+            # UW DOSE -- BHZ M 40.0 2019-05-03T01:20:59.315000Z 2019-05-03T01:23:10.740000Z
+            for line in lines:
+                split_line = line.split()
+                assert split_line[0] == network
+                assert split_line[1] == station
+                assert split_line[3] == channels[c]
+                
+                # who knows what happened, but not worth our time
+                if float(split_line[5]) != sampling_rate:
+                    continue
 
-            # if continuous time is less than 1 hour, skip it; it's not worth our time
-            if line_left < 1 / 24:
-                continue
+                line_start = obs.UTCDateTime(split_line[6])
+                line_stop = obs.UTCDateTime(split_line[7])
 
-            # check if start and stop time are on the same day
-            if line_time.replace(hour=0, minute=0, second=0, microsecond=0) != line_stop.replace(hour=0, minute=0, second=0, microsecond=0):
-                # first day until midnight
-                next_day = (line_time + dt.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                line_time = line_start
+                line_left = (line_stop - line_start) / 86400 # in days
 
-                day_idx = dates.index(line_time.replace(hour=0, minute=0, second=0, microsecond=0))
-                avail[day_idx, c] += (next_day - line_time) / 86400
+                # if continuous time is less than 1 hour, skip it; it's not worth our time
+                if line_left < 1 / 24:
+                    continue
 
-                # now deal with everything after the first day
-                line_time = next_day
-                line_left = (line_stop - line_time) / 86400
+                # check if start and stop time are on the same day
+                if line_time.replace(hour=0, minute=0, second=0, microsecond=0) != line_stop.replace(hour=0, minute=0, second=0, microsecond=0):
+                    # first day until midnight
+                    next_day = (line_time + dt.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
 
-                # can simply add 1 to every day that is complete
-                if line_left > 1:
                     day_idx = dates.index(line_time.replace(hour=0, minute=0, second=0, microsecond=0))
-                    avail[day_idx:day_idx + int(line_left), c] += 1
-                    
-                    line_time = (line_time + dt.timedelta(days=int(line_left))).replace(hour=0, minute=0, second=0, microsecond=0)
-                    line_left -= int(line_left)
+                    avail[day_idx, c] += (next_day - line_time) / 86400
 
-            # last (partial) day of the line
-            day_idx = dates.index(line_time.replace(hour=0, minute=0, second=0, microsecond=0))
+                    # now deal with everything after the first day
+                    line_time = next_day
+                    line_left = (line_stop - line_time) / 86400
 
-            avail[day_idx, c] += (line_stop - line_time) / 86400.
+                    # can simply add 1 to every day that is complete
+                    if line_left > 1:
+                        day_idx = dates.index(line_time.replace(hour=0, minute=0, second=0, microsecond=0))
+                        avail[day_idx:day_idx + int(line_left), c] += 1
+                        
+                        line_time = (line_time + dt.timedelta(days=int(line_left))).replace(hour=0, minute=0, second=0, microsecond=0)
+                        line_left -= int(line_left)
+
+                # last (partial) day of the line
+                day_idx = dates.index(line_time.replace(hour=0, minute=0, second=0, microsecond=0))
+
+                avail[day_idx, c] += (line_stop - line_time) / 86400.
 
     return avail
 
