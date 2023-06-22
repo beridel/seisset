@@ -153,12 +153,9 @@ while date <= stop_date:
 
 n_dates = len(dates)
 
-#missing_stations = ['SHUK', 'SHW', 'SMW', 'SOS', 'SP2', 'STAR', 'STW', 'SVOH', 'TDL', 'TOLT', 'UWFH', 'VVHS', 'WISH']
 with open(all_out_file, 'w+') as all_out:
     for network in inventory:
         for station in network:
-        #for station_code in missing_stations:
-            #station = inventory.select(network='UW', station=station_code)[0][0]
             channel_ids = []
             for channel in station:
                 channel_ids.append('{}:{:d}'.format(channel.code, int(channel.sample_rate)))
@@ -166,7 +163,6 @@ with open(all_out_file, 'w+') as all_out:
             channel_ids = set(channel_ids)
 
             avail_station = np.zeros((n_dates, 3), dtype=np.single) # N E Z
-
 
             timer = dt.datetime.now()
             for channel_id in channel_ids:
