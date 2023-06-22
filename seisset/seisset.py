@@ -104,7 +104,7 @@ max_latitude = 51
 min_longitude = -129
 max_longitude = -121.5
 location = '*'
-channels_search = 'BHN,BHE,BHZ,HHN,HHE,HHZ,EHN,EHE,EHZ'
+channels_search = 'BHN,BHE,BHZ,HHN,HHE,HHZ,EHN,EHE,EHZ,EH1,EH2,SHN,SHE,SHZ'
 start_time = '2005-01-01T00:00:00'
 stop_time = '2023-06-01T00:00:00'
 start_before = '2010-01-01T00:00:00'
@@ -153,9 +153,12 @@ while date <= stop_date:
 
 n_dates = len(dates)
 
+#missing_stations = ['SHUK', 'SHW', 'SMW', 'SOS', 'SP2', 'STAR', 'STW', 'SVOH', 'TDL', 'TOLT', 'UWFH', 'VVHS', 'WISH']
 with open(all_out_file, 'w+') as all_out:
     for network in inventory:
         for station in network:
+        #for station_code in missing_stations:
+            #station = inventory.select(network='UW', station=station_code)[0][0]
             channel_ids = []
             for channel in station:
                 channel_ids.append('{}:{:d}'.format(channel.code, int(channel.sample_rate)))
@@ -171,22 +174,34 @@ with open(all_out_file, 'w+') as all_out:
                 sampling_rate = float(channel_id.split(':')[1])
                 avail = get_avail(network.code, station.code, '*', channel, sampling_rate, dates)
 
-                if channel[-1] == 'N':
+                if channel[-1] == 'N' or channel[-1] == '1':
                     c = 0
-                elif channel[-1] == 'E':
+                elif channel[-1] == 'E' or channel[-1] == '2':
                     c = 1
                 elif channel[-1] == 'Z':
                     c = 2
                 avail_station[:, c] += avail.flatten()
 
-                with open(os.path.join(os.getcwd(), out_dir, '{}.{}_avail.txt'.format(station.code, channel_id)), 'w+') as station_out:
+                with open(os.path.join(os.getcwd(), out_dir, '{}.{}.{}_avail.txt'.format(network.code, station.code, channel_id)), 'w+') as station_out:
                     for d in range(n_dates):
                         station_out.write('{} {:.2f}\n'.format(dates[d].strftime('%Y-%m-%d'), avail.flatten()[d]))
 
-            all_out.write('{}.{} | N: {:04.1f} E: {:04.1f} Z: {:04.1f} (min: {:.2f} yr)\n'.format(network.code,
-                                                                                             station.code,
-                                                                                             np.sum(avail_station[:, 0]),
-                                                                                             np.sum(avail_station[:, 1]),
-                                                                                             np.sum(avail_station[:, 2]),
-                                                                                             np.min(np.sum(avail_station, axis=0)) / 365))
+            if np.sum(avail_station[:, 0:1].flatten()) == 0.:
+                out_text = '{}.{} | 1C | shortest: {:.2f} yr | N: {:04.1f} E: {:04.1f} Z: {:04.1f}\n'
+            else:
+                out_text = '{}.{} | 3C | shortest: {:.2f} yr | N: {:04.1f} E: {:04.1f} Z: {:04.1f}\n'
+
+            channel_uptime = np.sum(avail_station, axis=0)
+            nonzero_channels = channel_uptime[channel_uptime !=0]
+            if nonzero_channels.size == 0:
+                shortest_uptime = 0
+            else:
+                shortest_uptime = np.min(nonzero_channels) / 365 # in years
+
+            all_out.write(out_text.format(network.code,
+                                          station.code,
+                                          shortest_uptime,
+                                          np.sum(avail_station[:, 0]),
+                                          np.sum(avail_station[:, 1]),
+                                          np.sum(avail_station[:, 2])))
             print('It took {:.2f}s for {}:{}.'.format((dt.datetime.now() - timer).total_seconds(), network.code, station.code))
