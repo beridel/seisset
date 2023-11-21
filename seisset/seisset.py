@@ -98,15 +98,15 @@ out_dir = 'avail'
 if not os.path.isdir(os.path.join(os.getcwd(), out_dir)):
     os.mkdir(os.path.join(os.getcwd(), out_dir))
 
-networks = 'UW,PB,CC,CN,C8'
-min_latitude = 46
-max_latitude = 51
-min_longitude = -129
-max_longitude = -121.5
+networks = 'UW,PB,CC,CN,C8,US,N4,PO'
+min_latitude = 45.5
+max_latitude = 50
+min_longitude = -126.5
+max_longitude = -120.5
 location = '*'
 channels_search = 'BHN,BHE,BHZ,HHN,HHE,HHZ,EHN,EHE,EHZ,EH1,EH2,SHN,SHE,SHZ'
-start_time = '2005-01-01T00:00:00'
-stop_time = '2023-06-01T00:00:00'
+start_time = '2003-01-01T00:00:00'
+stop_time = '2023-12-31T00:00:00'
 start_before = '2010-01-01T00:00:00'
 stop_after = '2020-01-01T00:00:00'
 start_date = obs.UTCDateTime(start_time)
